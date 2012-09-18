@@ -4,46 +4,52 @@ library(plyr)
 
 main <- function() {
   top <- 10
-  main_frame_chunks <- read.csv('/path/to/LCAFY2012_Q2.csv')
+  if (file.exists("lca_data.RData")) {
+    load("lca_data.RData")
+  } else {
+    main_frame <- read.csv("http://www.foreignlaborcert.doleta.gov/pdf/quarter_2_2012/LCAFY2012_Q2.csv")
+    save(main_frame, file="lca_data.RData")
+  }
 
   cat("finished reading\n")
-  main_frame_len <- nrow(main_frame_chunks)
+  main_frame_len <- nrow(main_frame)
   cat(paste("Processing ", main_frame_len, " rows\n"))
-  main_frame_chunks <- normalize(main_frame_chunks)
+  main_frame <- normalize(main_frame)
+  main_frame <- idata.frame(main_frame)
   cat("finished normalizing data\n")
 
   pretty_print('Most sought after VISAs')
-  visa_counts = with(main_frame_chunks, as.data.frame(table(VISA_CLASS)))
-  print(order_by(visa_counts, "Freq", decreasing=TRUE))
+  visa_counts = ddply(main_frame, .(VISA_CLASS), nrow)
+  print(arrange(visa_counts, V1, decreasing=TRUE))
 
   pretty_print('Top ten job titles')
-  job_counts <- with(main_frame_chunks, as.data.frame(table(JOB_TITLE)))
-  print(order_by(job_counts, "Freq", decreasing=TRUE)[1:top,])
+  job_counts <- ddply(main_frame, .(JOB_TITLE), nrow)
+  print(arrange(job_counts, V1, decreasing=TRUE)[1:top,])
 
   pretty_print('Employers with most number of VISAS in any status')
   employer_status_count <-
-    with(main_frame_chunks, as.data.frame(table(EMPLOYER_NAME, STATUS)))
+    with(main_frame, as.data.frame(table(EMPLOYER_NAME, STATUS)))
   print(order_by(employer_status_count, 'Freq', decreasing=TRUE)[1:top,])
 
-  status_count = table(main_frame_chunks$STATUS)
+  status_count = table(main_frame$STATUS)
   pretty_print(paste(status_count[["CERTIFIED"]], 'VISAs are certified and',
                      main_frame_len - status_count[["CERTIFIED"]], 'are not'))
 
   pretty_print("Employers with the highest salary budget")
   employer_sum <-
-    with(main_frame_chunks, tapply(RATE_FROM, data.frame(EMPLOYER_NAME),
+    with(main_frame, tapply(RATE_FROM, data.frame(EMPLOYER_NAME),
                                    sum, na.rm=TRUE))
   employer_sum <- as.data.frame(as.table(employer_sum), responseName="sum")
   print(order_by(employer_sum, "sum", decreasing=TRUE)[1:top,])
 
   pretty_print('The city offering the highest dough (summed over all positions)')
-  city_sum <- with(main_frame_chunks,
+  city_sum <- with(main_frame,
     tapply(RATE_FROM, data.frame(EMPLOYER_CITY, EMPLOYER_STATE), sum, na.rm=TRUE))
   city_sum <- as.data.frame(as.table(city_sum), responseName="sum")
   print(order_by(city_sum, "sum", decreasing=TRUE)[1:top,])
 
   pretty_print('Jobs with the most dough (summed across offers from all employers)')
-  job_title_group <- with(main_frame_chunks, tapply(RATE_FROM, data.frame(JOB_TITLE), sum, na.rm=TRUE))
+  job_title_group <- with(main_frame, tapply(RATE_FROM, data.frame(JOB_TITLE), sum, na.rm=TRUE))
   job_title_group <- as.data.frame(as.table(job_title_group), responseName="sum")
   print(order_by(job_title_group, "sum", decreasing=TRUE)[1:top,])
   print('Done')
